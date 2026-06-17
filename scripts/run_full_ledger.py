@@ -18,11 +18,19 @@ def main() -> int:
         default="python_reference",
         choices=["mock", "python_reference", "guard"],
     )
+    parser.add_argument("--run-live", action="store_true", help="Include live Azure ZDR ping")
+    parser.add_argument("--run-heavy", action="store_true", help="Include 1000-note disk audit")
     args = parser.parse_args()
+
+    cmd = [sys.executable, "-m", "pytest", "tests/", "-v", f"--target={args.target}"]
+    if args.run_live:
+        cmd.append("--run-live")
+    if args.run_heavy:
+        cmd.append("--run-heavy")
 
     print(f"Running compliance UAT with adapter: {args.target}")
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/", "-v", f"--target={args.target}"],
+        cmd,
         cwd=ROOT,
     )
     if result.returncode != 0:

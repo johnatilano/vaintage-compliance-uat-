@@ -47,3 +47,23 @@ def test_payload_capture_ledger(target, phi_samples):
     assert path.exists()
     text = path.read_text()
     assert "[NAME]" in text or target.name == "mock"
+
+
+def test_outbound_json_payload_has_no_raw_phi(target, phi_samples):
+    """Intercept serialized JSON request body — zero raw PHI in transit."""
+    sample = phi_samples["samples"][0]
+    payload_json = target.build_outbound_payload(sample["raw"])
+    needles = phi_samples["must_not_appear_after_scrub"]
+
+    if target.name == "mock":
+        assert "John Doe" not in payload_json
+        return
+
+    leaks = [n for n in needles if n.lower() in payload_json.lower()]
+    assert leaks == [], f"Raw PHI in outbound JSON: {leaks}"
+
+    body = target.parse_outbound_payload(payload_json)
+    assert body.get("store") is False, "Outbound payload must set store=false for ZDR"
+    assert body["messages"][0]["role"] == "user"
+    content = body["messages"][0]["content"]
+    assert any(tok in content for tok in phi_samples["expected_tokens"])

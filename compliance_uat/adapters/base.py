@@ -1,9 +1,12 @@
 """Adapter interface — plug in Guard, reference stub, or mock."""
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from compliance_uat.payload import serialize_outbound_payload
 
 
 @dataclass
@@ -31,6 +34,14 @@ class DiskAuditResult:
         return sum(self.keyword_hits.values()) == 0
 
 
+@dataclass
+class VaporizationResult:
+    cache_cleared: bool
+    gc_collect_called: bool
+    memory_wiped: bool = False
+    detail: str = ""
+
+
 class PrivacyTestTarget(ABC):
     """Any Layer 2 app implements this contract for the generic test suite."""
 
@@ -46,7 +57,20 @@ class PrivacyTestTarget(ABC):
     def simulate_typing_session(self, notes: list[str]) -> None: ...
 
     @abstractmethod
-    def dismiss_overlay(self) -> None: ...
+    def dismiss_overlay(self) -> VaporizationResult: ...
+
+    def build_outbound_payload(self, raw_note: str) -> str:
+        """Scrub and serialize the JSON body that would be sent to the cloud API."""
+        cfg = self.get_api_config()
+        scrubbed = self.scrub(raw_note)
+        return serialize_outbound_payload(
+            scrubbed,
+            deployment=cfg.deployment,
+            store=cfg.store,
+        )
+
+    def parse_outbound_payload(self, payload_json: str) -> dict:
+        return json.loads(payload_json)
 
     @abstractmethod
     def peek_memory_cache(self) -> str | None: ...

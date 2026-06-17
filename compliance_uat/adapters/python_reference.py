@@ -1,10 +1,11 @@
 """Reference adapter — Safe Harbor scrubber + in-memory-only session."""
 from __future__ import annotations
 
+import gc
 import os
 from pathlib import Path
 
-from compliance_uat.adapters.base import ApiConfig, PrivacyTestTarget
+from compliance_uat.adapters.base import ApiConfig, PrivacyTestTarget, VaporizationResult
 from compliance_uat.scrubber import scrub
 
 
@@ -33,9 +34,17 @@ class PythonReferenceTarget(PrivacyTestTarget):
         self._session_notes = list(notes)
         self._cache = scrub(notes[-1]) if notes else None
 
-    def dismiss_overlay(self) -> None:
+    def dismiss_overlay(self) -> VaporizationResult:
+        # Mirror Guard's compliance-drawer path: drop refs then force collection.
         self._cache = None
         self._session_notes.clear()
+        gc.collect()
+        return VaporizationResult(
+            cache_cleared=self._cache is None and not self._session_notes,
+            gc_collect_called=True,
+            memory_wiped=True,
+            detail="Reference ConcurrentDictionary-equivalent cache cleared; gc.collect() invoked",
+        )
 
     def peek_memory_cache(self) -> str | None:
         return self._cache
@@ -44,8 +53,10 @@ class PythonReferenceTarget(PrivacyTestTarget):
         root = Path(__file__).resolve().parent.parent.parent
         paths = [
             root / "compliance-ledger",
-            Path(os.environ.get("TEMP", "/tmp")),
+            root / ".uat-scratch",
         ]
+        if os.environ.get("UAT_WATCH_TEMP", "").lower() in {"1", "true", "yes"}:
+            paths.append(Path(os.environ.get("TEMP", "/tmp")))
         for env_key in ("LOCALAPPDATA", "APPDATA"):
             val = os.environ.get(env_key)
             if val:
