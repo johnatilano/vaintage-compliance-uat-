@@ -1,0 +1,38 @@
+{
+  "description": "Synthetic PHI strings for Safe Harbor scrub tests. Never use real patient data.",
+  "samples": [
+    {
+      "id": "blatant-identifiers",
+      "raw": "Patient John Doe, DOB 11/14/1983, phone 555-0199, MRN 004821, reports high anxiety at the Florida clinic on 123 Main St, Tampa FL 33602. Email: john.doe@example.com, SSN 123-45-6789."
+    },
+    {
+      "id": "substance-clinical",
+      "raw": "Counselor note: patient discusses substance use and transportation barriers. Contact Mary Smith at 813-555-4422. DOB: 03/22/1975."
+    },
+    {
+      "id": "minimal-phi",
+      "raw": "James Wilson, age 42, seen today for methadone dosing."
+    }
+  ],
+  "must_not_appear_after_scrub": [
+    "John Doe",
+    "11/14/1983",
+    "555-0199",
+    "004821",
+    "john.doe@example.com",
+    "123-45-6789",
+    "Mary Smith",
+    "813-555-4422",
+    "James Wilson"
+  ],
+  "expected_tokens": [
+    "[NAME]",
+    "[DATE]",
+    "[PHONE]",
+    "[MRN]",
+    "[EMAIL]",
+    "[SSN]",
+    "[ADDRESS]",
+    "[ZIP]"
+  ]
+}

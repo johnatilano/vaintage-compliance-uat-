@@ -1,0 +1,11 @@
+{
+  "description": "Keywords injected during Phase 3 typing simulation; must not persist to disk.",
+  "session_keywords": [
+    "substance",
+    "anxiety",
+    "transportation",
+    "methadone",
+    "counseling"
+  ],
+  "session_note_template": "Patient reports {keyword} concerns during today's session. No illicit use reported."
+}

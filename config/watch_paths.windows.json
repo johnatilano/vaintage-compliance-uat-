@@ -1,0 +1,10 @@
+{
+  "description": "Paths scanned during Phase 3 negative-log audit on Windows.",
+  "paths": [
+    "%LOCALAPPDATA%\\VAIntage",
+    "%APPDATA%\\VAIntage",
+    "%TEMP%",
+    ".\\compliance-ledger"
+  ],
+  "extensions": [".log", ".txt", ".json", ".db", ".sqlite", ".cache"]
+}
