@@ -11,7 +11,7 @@ name = "vaintage-compliance-uat"
 version = "0.1.0"
 description = "Portable ZDR / Safe Harbor compliance UAT harness for VAIntage Guard"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = []
 
 [project.optional-dependencies]
@@ -20,3 +20,7 @@ dev = ["pytest>=8.0"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+markers = [
+    "integration: live Azure OpenAI ZDR ping (requires --run-live or RUN_LIVE_ZDR=1)",
+    "heavy: 1000-note disk audit (requires --run-heavy or RUN_HEAVY=1)",
+]

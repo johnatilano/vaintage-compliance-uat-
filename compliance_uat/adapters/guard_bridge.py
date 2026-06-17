@@ -5,7 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from compliance_uat.adapters.base import ApiConfig, PrivacyTestTarget
+from compliance_uat.adapters.base import ApiConfig, PrivacyTestTarget, VaporizationResult
 
 
 class GuardBridgeTarget(PrivacyTestTarget):
@@ -27,13 +27,19 @@ class GuardBridgeTarget(PrivacyTestTarget):
         if not self._exe or not self._exe.is_file():
             raise FileNotFoundError(
                 "GUARD_TEST_EXE not set or file missing. "
-                "Point it at John's Guard test executable when ready."
+                "Point it at John's Guard test executable, or use "
+                "scripts/guard_test_stub.py until the C# build is ready."
             )
+        self._use_python = self._exe.suffix.lower() == ".py"
 
     def _run(self, *args: str) -> str:
         assert self._exe is not None
+        cmd = [str(self._exe), *args]
+        if self._use_python:
+            import sys
+            cmd = [sys.executable, *cmd]
         result = subprocess.run(
-            [str(self._exe), *args],
+            cmd,
             capture_output=True,
             text=True,
             check=True,
@@ -58,8 +64,24 @@ class GuardBridgeTarget(PrivacyTestTarget):
     def simulate_typing_session(self, notes: list[str]) -> None:
         self._run("simulate", "--count", str(len(notes)))
 
-    def dismiss_overlay(self) -> None:
-        self._run("dismiss")
+    def dismiss_overlay(self) -> VaporizationResult:
+        import json
+
+        raw = self._run("dismiss")
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return VaporizationResult(
+                cache_cleared=True,
+                gc_collect_called=False,
+                detail=raw or "dismiss completed (no JSON metadata)",
+            )
+        return VaporizationResult(
+            cache_cleared=bool(data.get("cache_cleared", True)),
+            gc_collect_called=bool(data.get("gc_collect_called", False)),
+            memory_wiped=bool(data.get("memory_wiped", False)),
+            detail=str(data.get("detail", "")),
+        )
 
     def peek_memory_cache(self) -> str | None:
         out = self._run("cache-peek")

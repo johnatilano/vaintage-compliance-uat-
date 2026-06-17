@@ -64,7 +64,14 @@ def write_disk_audit_manifest(
     return path
 
 
-def write_vaporization_report(*, adapter: str, passed: bool, detail: str) -> Path:
+def write_vaporization_report(
+    *,
+    adapter: str,
+    passed: bool,
+    detail: str,
+    gc_collect_called: bool = False,
+    memory_wiped: bool = False,
+) -> Path:
     LEDGER_DIR.mkdir(parents=True, exist_ok=True)
     path = LEDGER_DIR / "vaporization-report.json"
     payload = {
@@ -72,6 +79,20 @@ def write_vaporization_report(*, adapter: str, passed: bool, detail: str) -> Pat
         "adapter": adapter,
         "passed": passed,
         "detail": detail,
+        "gc_collect_called": gc_collect_called,
+        "memory_wiped": memory_wiped,
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return path
+
+
+def write_live_zdr_report(result: dict, adapter: str) -> Path:
+    LEDGER_DIR.mkdir(parents=True, exist_ok=True)
+    path = LEDGER_DIR / "live-zdr-report.json"
+    payload = {
+        "generated_at": _stamp(),
+        "adapter": adapter,
+        **result,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path

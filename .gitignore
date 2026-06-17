@@ -6,4 +6,5 @@ venv/
 .env
 compliance-ledger/*
 !compliance-ledger/.gitkeep
+.uat-scratch/
 *.log
