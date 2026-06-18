@@ -16,8 +16,12 @@ run_or_fail() {
 if command -v dotnet >/dev/null 2>&1; then
   echo "=== Building guard-test.exe ==="
   dotnet build "$ROOT/src/VAIntage.Guard.TestCli" -c Release
-  export GUARD_TEST_EXE="$ROOT/src/VAIntage.Guard.TestCli/bin/Release/net8.0/guard-test"
-  [[ -f "$GUARD_TEST_EXE" ]] || export GUARD_TEST_EXE="${GUARD_TEST_EXE}.exe"
+  if [[ -x "$ROOT/scripts/guard-test-mac.sh" ]]; then
+    export GUARD_TEST_EXE="$ROOT/scripts/guard-test-mac.sh"
+  else
+    export GUARD_TEST_EXE="$ROOT/src/VAIntage.Guard.TestCli/bin/Release/net8.0/guard-test"
+    [[ -f "$GUARD_TEST_EXE" ]] || export GUARD_TEST_EXE="${GUARD_TEST_EXE}.exe"
+  fi
   echo
   run_or_fail "Phase 1 (C# xUnit)" dotnet test "$ROOT/phase1/VAIntage.Phase1.Scrubbing.Tests" --verbosity minimal
   run_or_fail "Phase 4 (C# xUnit)" dotnet test "$ROOT/phase4/VAIntage.Phase4.Vaporization.Tests" --verbosity minimal

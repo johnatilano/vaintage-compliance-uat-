@@ -20,18 +20,25 @@ function Resolve-GuardTestExe {
     param([string]$Override)
     if ($Override -and (Test-Path $Override)) { return (Resolve-Path $Override).Path }
     $candidates = @(
+        (Join-Path $RepoRoot "scripts/guard-test-mac.sh"),
         (Join-Path $RepoRoot "src/VAIntage.Guard.TestCli/bin/Release/net8.0/guard-test.exe"),
-        (Join-Path $RepoRoot "src/VAIntage.Guard.TestCli/bin/Debug/net8.0/guard-test.exe")
+        (Join-Path $RepoRoot "src/VAIntage.Guard.TestCli/bin/Release/net8.0/guard-test"),
+        (Join-Path $RepoRoot "src/VAIntage.Guard.TestCli/bin/Debug/net8.0/guard-test.exe"),
+        (Join-Path $RepoRoot "src/VAIntage.Guard.TestCli/bin/Debug/net8.0/guard-test")
     )
     foreach ($c in $candidates) {
         if (Test-Path $c) { return (Resolve-Path $c).Path }
     }
-    throw "guard-test.exe not found. Run: dotnet build src/VAIntage.Guard.TestCli -c Release"
+    throw "guard-test not found. Run: dotnet build src/VAIntage.Guard.TestCli -c Release"
 }
 
 function Invoke-GuardTest {
-    param([string]$Exe, [string[]]$Args)
-    $out = & $Exe @Args 2>&1
+    param([string]$Exe, [string[]]$GuardArgs)
+    if ($Exe -match '\.(sh|bash)$') {
+        $out = & bash $Exe @GuardArgs 2>&1
+    } else {
+        $out = & $Exe @GuardArgs 2>&1
+    }
     if ($LASTEXITCODE -ne 0) { throw "guard-test failed: $out" }
     return ($out | Out-String).Trim()
 }
@@ -39,7 +46,7 @@ function Invoke-GuardTest {
 $guardTest = Resolve-GuardTestExe -Override $GuardTestExe
 Write-Host "Using guard-test: $guardTest"
 
-$watchJson = Invoke-GuardTest -Exe $guardTest -Args @("watch-paths")
+$watchJson = Invoke-GuardTest -Exe $guardTest -GuardArgs @("watch-paths")
 $WatchPaths = @($watchJson | ConvertFrom-Json) | Where-Object { $_ -and (Test-Path $_ -PathType Container -ErrorAction SilentlyContinue) }
 
 function Get-FileInventory($paths) {
@@ -56,7 +63,7 @@ Write-Host "Phase 3 — snapshot before guard-test simulate..."
 $before = Get-FileInventory $WatchPaths
 
 Write-Host "Invoking guard-test simulate --count $NoteCount ..."
-$simJson = Invoke-GuardTest -Exe $guardTest -Args @("simulate", "--count", "$NoteCount")
+$simJson = Invoke-GuardTest -Exe $guardTest -GuardArgs @("simulate", "--count", "$NoteCount")
 $sim = $simJson | ConvertFrom-Json
 
 Write-Host "Phase 3 — snapshot after typing simulation..."
