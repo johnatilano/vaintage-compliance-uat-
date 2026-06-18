@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>guard-test</AssemblyName>
+    <RootNamespace>VAIntage.Guard.TestCli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VAIntage.Guard.Host\VAIntage.Guard.Host.csproj" />
+  </ItemGroup>
+</Project>

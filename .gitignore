@@ -8,3 +8,10 @@ compliance-ledger/*
 !compliance-ledger/.gitkeep
 .uat-scratch/
 *.log
+vaintage_compliance_uat.egg-info/
+vaintage_phase2_zdr.egg-info/
+
+# .NET
+**/bin/
+**/obj/
+.vs/

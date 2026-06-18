@@ -1,176 +1,166 @@
-# VAIntage Compliance UAT
+# VAIntage Compliance UAT — John's Four-Phase ZDR Certification Suite
 
-Portable test harness for proving **Zero Data Retention (ZDR)** and **Safe Harbor**
-privacy claims for the Layer 2 Guard agent. Runs against any app that implements
-the `PrivacyTestTarget` adapter interface.
+Prove **Zero Data Retention (ZDR)** and **Safe Harbor** claims for the Layer 2 Guard
+agent and **oc-4 mini** Azure OpenAI deployment. Each phase uses the language from
+the UAT handoff document.
 
-This repo is **separate** from:
+| Phase | Language | What it proves |
+|-------|----------|----------------|
+| **1** | **C# xUnit** | Zero raw PHI in outbound JSON; `[CLIENT_REF]` tokens; SHA-256 attestation |
+| **2** | **Python** | `store: false`, data logging disabled — reads **`guard-test.exe config`** |
+| **3** | **PowerShell** | 0 clinical keywords on disk after **`guard-test simulate --count 1000`** |
+| **4** | **C# xUnit** | `ConcurrentDictionary` cleared; real **`GC.Collect()`** on production path |
 
-- [`LambentDataScrapers`](https://github.com/jyfygdzdhp-star/LambentDataScrapers) — Layer 1 rules Brain
-- John's C# Guard repo — Layer 2 production desktop agent
+**John integrates:** `src/VAIntage.Guard.Host/GuardApplication.cs` into the Guard desktop app.
 
-## Quick start
+---
 
-```bash
-cd vaintage-compliance-uat
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+## Prerequisites (Windows)
 
-# CI / smoke (no cloud, no Windows)
-pytest tests/ --target=mock
+- [.NET 8 SDK](https://dotnet.microsoft.com/download)
+- Python 3.9+
+- PowerShell 5+ (or PowerShell 7)
 
-# Demo / stakeholder proof (reference scrubber)
-pytest tests/ --target=python_reference
+---
 
-# Full ledger for executives
-python scripts/run_full_ledger.py --target=python_reference
-
-# Full sign-off including 1000-note audit + live Azure (when creds ready)
-python scripts/run_full_ledger.py --target=python_reference --run-heavy --run-live
-```
-
-Outputs land in `compliance-ledger/`:
-
-| Artifact | Phase | Proves |
-|----------|-------|--------|
-| `payload-capture.txt` | 1 | Outbound text is de-identified |
-| `api-config-snapshot.json` | 2 | `store: false` / ZDR flags |
-| `live-zdr-report.json` | 2 | Live Azure accepted `store=false` request |
-| `disk-audit-manifest.json` | 3 | No clinical keywords on disk |
-| `vaporization-report.json` | 4 | RAM cleared + GC on drawer dismiss |
-| `certification-summary.json` | All | Handoff index |
-
-## What running the test suite entails
-
-Running the suite is a **local, automated compliance check**. No cloud calls, UI
-clicks, or production Guard install are required unless you opt in.
-
-### One-time setup
-
-1. Create a venv and install dev dependencies (`pip install -e ".[dev]"`).
-2. Copy `config/staging.example.env` → `.env` and fill in Azure values for Phase 2 live tests.
-
-### Pick an adapter (`--target`)
-
-| Adapter | Purpose |
-|---------|---------|
-| `mock` | CI smoke — proves harness wiring only |
-| `python_reference` | Demos and scrubber contract reference |
-| `guard` | Final sign-off against Guard (C# exe or local stub) |
-
-### What pytest runs (13 tests across 4 phases)
-
-**Phase 1 — Scrubbing**
-- Feeds synthetic PHI (e.g. “Patient John Doe, DOB 11/14/1983…”) through `scrub()`
-- Asserts zero raw identifiers remain
-- Asserts structural tokens (`[NAME]`, `[DATE]`, `[PHONE]`, etc.)
-- **New:** serializes the outbound JSON request body and asserts no PHI in transit + `store: false`
-- Writes `payload-capture.txt`
-
-**Phase 2 — ZDR configuration**
-- Reads API client config and asserts `store=false` + data logging disabled
-- Writes `api-config-snapshot.json`
-- **New (optional):** live POST to Azure OpenAI with `store=false` when `--run-live` or `RUN_LIVE_ZDR=1`
-
-**Phase 3 — Disk audit**
-- Snapshots watched folders → simulates typing clinical keywords → re-snapshots
-- Scans **new** text files for keywords (`substance`, `anxiety`, `transportation`, …)
-- Writes `disk-audit-manifest.json`
-- **New (optional):** 1,000-note heavy session when `--run-heavy` or `RUN_HEAVY=1`
-
-**Phase 4 — Vaporization**
-- Loads text into volatile cache → dismisses overlay → asserts cache is `None`
-- **New:** asserts `gc.collect()` / `GC.Collect()` was invoked and memory wiped
-- Writes `vaporization-report.json`
-
-### Optional flags
-
-```bash
-pytest tests/ --target=python_reference --run-heavy    # 1000-note disk audit
-pytest tests/ --target=python_reference --run-live     # live Azure ZDR ping
-pytest tests/ --target=guard                           # Guard stub or C# exe
-```
-
-Environment gates (in `.env`):
-
-| Variable | Purpose |
-|----------|---------|
-| `RUN_HEAVY=1` | Enable 1000-note test without CLI flag |
-| `HEAVY_SESSION_COUNT` | Override note count (default 1000) |
-| `RUN_LIVE_ZDR=1` | Enable live Azure test without CLI flag |
-| `AZURE_OPENAI_API_KEY` | Required for live ping |
-| `GUARD_TEST_EXE` | Path to C# guard-test.exe (auto-falls back to Python stub) |
-
-### What it still cannot prove
-
-- No inspection of Azure’s remote RAM or servers
-- No UI automation of the real compliance drawer (Guard adapter simulates dismiss via CLI)
-- Live Azure test requires staging credentials and John confirming ZDR is enabled
-
-## Adapters
-
-| Adapter | When to use |
-|---------|-------------|
-| `mock` | GitHub Actions CI — proves harness wiring |
-| `python_reference` | UAT demos, contract reference for John's scrubber |
-| `guard` | Final sign-off against real Guard test exe |
-
-### Guard adapter
-
-Set `GUARD_TEST_EXE` to a Guard test build that supports:
-
-```
-guard-test.exe scrub --text "..."
-guard-test.exe config
-guard-test.exe simulate --count 1000
-guard-test.exe dismiss          → JSON: cache_cleared, gc_collect_called, memory_wiped
-guard-test.exe cache-peek
-guard-test.exe watch-paths
-```
-
-Until the C# build exists, the harness auto-uses `scripts/guard_test_stub.py`:
-
-```bash
-pytest tests/ --target=guard
-```
-
-## Phase 2 staging config
-
-```bash
-cp config/staging.example.env .env
-# Fill in Azure staging values — ask John if ZDR is enabled
-```
-
-## Windows disk watch (manual Phase 3)
-
-During a live Guard typing session on Windows:
+## One-command full UAT (Windows)
 
 ```powershell
-.\scripts\disk_watch.ps1
+cd vaintage-compliance-uat
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+
+copy config\staging.example.env .env
+# Fill AZURE_OPENAI_* — ask John if ZDR is enabled on oc-4 mini staging
+
+.\scripts\Run-FullComplianceUat.ps1
 ```
+
+This will:
+1. Build **`guard-test.exe`**
+2. Run Phase 1 & 4 C# xUnit tests through **`GuardApplication`** (production wiring)
+3. Run Phase 2 Python audit against **`guard-test config`**
+4. Run Phase 3 PowerShell disk audit calling **`guard-test simulate`**
+5. Write **`compliance-ledger/certification-summary.json`**
+
+---
+
+## Run phases individually
+
+### Build guard-test.exe (required for Phases 2 & 3)
+
+```powershell
+dotnet build src/VAIntage.Guard.TestCli -c Release
+$env:GUARD_TEST_EXE = "src/VAIntage.Guard.TestCli/bin/Release/net8.0/guard-test.exe"
+```
+
+### Phase 1 — C# xUnit (scrubbing + payload intercept + SHA-256)
+
+```powershell
+dotnet test phase1/VAIntage.Phase1.Scrubbing.Tests -v
+```
+
+Tests **`GuardApplication.BuildOutboundPayloadJson()`** and **`AttestOutboundPayload()`**.  
+Writes **`compliance-ledger/payload-capture.txt`**.
+
+### Phase 2 — Python (ZDR config audit)
+
+```powershell
+$env:PYTHONPATH = "phase2"
+pytest phase2/tests/ -v
+
+# Optional live Azure ping:
+pytest phase2/tests/ --run-live -v
+```
+
+Reads config from **`guard-test.exe config`** when built.  
+Writes **`compliance-ledger/api-config-snapshot.json`**.
+
+### Phase 3 — PowerShell (1,000-note disk audit)
+
+```powershell
+.\phase3\Run-DiskAudit.ps1 -NoteCount 1000 -GuardTestExe $env:GUARD_TEST_EXE
+```
+
+Calls **`guard-test simulate --count 1000`** and **`watch-paths`**.  
+Writes **`compliance-ledger/disk-audit-manifest.json`**.
+
+### Phase 4 — C# xUnit (compliance drawer vaporization)
+
+```powershell
+dotnet test phase4/VAIntage.Phase4.Vaporization.Tests -v
+```
+
+**Production path** test uses **`RuntimeGcCollector`** + **`SecureMemoryWiper`**.  
+Writes **`compliance-ledger/vaporization-report.json`**.
+
+---
+
+## guard-test.exe CLI
+
+```
+guard-test scrub --text "Patient John Doe..."
+guard-test config
+guard-test simulate --count 1000
+guard-test dismiss
+guard-test cache-peek
+guard-test watch-paths
+```
+
+---
+
+## Integrate into John's Guard repo
+
+Copy these into the Guard solution:
+
+```
+src/VAIntage.Guard.Core/     SafeHarborScrubber, OutboundPayloadHandler, etc.
+src/VAIntage.Guard.Host/     GuardApplication — single production facade
+```
+
+| Guard event | Call |
+|-------------|------|
+| Before Azure API POST | `app.BuildOutboundPayloadJson(rawNote)` |
+| Counselor typing session | `app.SimulateTypingSession(notes)` or your UI handler |
+| Compliance drawer Resolve | `app.DismissComplianceDrawer()` |
+
+Replace `GuardApplication.CreateProduction()` internals with John's DI container when ready.
+
+---
+
+## Compliance ledger checklist
+
+| Deliverable | Artifact |
+|-------------|----------|
+| Request Payload Capture | `payload-capture.txt` |
+| API Configuration Snapshot | `api-config-snapshot.json` |
+| Local Disk Audit Manifest | `disk-audit-manifest.json` |
+| Vaporization Report | `vaporization-report.json` |
+| Executive index | `certification-summary.json` |
+
+---
 
 ## Architecture
 
 ```
-fixtures/          synthetic PHI + clinical keywords (never real patients)
-compliance_uat/
-  adapters/        plug in mock | python_reference | guard
-  scrubber.py      reference Safe Harbor implementation (contract)
-  payload.py       outbound JSON body builder (Phase 1 intercept)
-  live_zdr.py      optional live Azure ZDR ping (Phase 2)
-  ledger.py        writes executive proof artifacts
-scripts/
-  guard_test_stub.py   Python Guard CLI stub for --target=guard
-  run_full_ledger.py   runs all phases + certification summary
-tests/             generic assertions (same for every adapter)
+src/
+  VAIntage.Guard.Core/       Scrubber, payload handler, attestation, session cache
+  VAIntage.Guard.Host/       GuardApplication — production wiring facade
+  VAIntage.Guard.TestCli/    guard-test.exe
+phase1/                      C# xUnit — Phase 1
+phase2/                      Python pytest — Phase 2
+phase3/                      PowerShell — Phase 3
+phase4/                      C# xUnit — Phase 4
+fixtures/                    Synthetic PHI + clinical keywords
+compliance-ledger/           Executive proof artifacts
 ```
 
-## Relationship to LambentDataScrapers
+---
 
-| Repo | Tests |
-|------|-------|
-| LambentDataScrapers | Rules engine — `uat_engine1.py`, `uat_engine2.py` |
-| vaintage-compliance-uat | Privacy / ZDR — this repo |
+## What still requires John's production Guard repo
 
-John's C# scrubber must match `compliance_uat/scrubber.py` output for Phase 1 sign-off.
+- WinUI compliance drawer click automation (Phase 4 uses `DismissComplianceDrawer()` API)
+- John's live `HttpClient` / Azure SDK wrapper (Phase 1 tests `GuardApplication` in this repo)
+- Confirming Azure ZDR is enabled on oc-4 mini staging (Phase 2 live ping)
+- Azure remote RAM — cannot be verified from the workstation

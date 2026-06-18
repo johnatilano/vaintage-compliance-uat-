@@ -3,14 +3,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["compliance_uat*"]
+where = ["phase2"]
+include = ["zdr_audit*"]
 
 [project]
-name = "vaintage-compliance-uat"
-version = "0.1.0"
-description = "Portable ZDR / Safe Harbor compliance UAT harness for VAIntage Guard"
-readme = "README.md"
+name = "vaintage-phase2-zdr"
+version = "1.0.0"
+description = "VAIntage UAT Phase 2 — Azure OpenAI ZDR configuration audit (Python)"
 requires-python = ">=3.9"
 dependencies = []
 
@@ -18,9 +17,8 @@ dependencies = []
 dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["phase2/tests"]
 addopts = "-v"
 markers = [
-    "integration: live Azure OpenAI ZDR ping (requires --run-live or RUN_LIVE_ZDR=1)",
-    "heavy: 1000-note disk audit (requires --run-heavy or RUN_HEAVY=1)",
+    "integration: live Azure OpenAI ZDR ping (RUN_LIVE_ZDR=1)",
 ]
